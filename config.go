@@ -8,7 +8,8 @@ import (
 )
 
 type Config struct {
-	Port uint16 `env:"PORT" envDefault:"8700" validate:"required,number,gte=0,lte=65535"`
+	Port    uint16   `env:"PORT"     envDefault:"8700" validate:"required,number,gte=0,lte=65535"`
+	APIKeys []string `env:"API_KEYS" envSeparator:","  validate:"required"`
 }
 
 func newConfig() Config {

@@ -9,8 +9,8 @@ type TaskManager struct {
 	tasks []*Task
 }
 
-func newTaskManager() TaskManager {
-	return TaskManager{
+func newTaskManager() *TaskManager {
+	return &TaskManager{
 		tasks: make([]*Task, 0),
 	}
 }

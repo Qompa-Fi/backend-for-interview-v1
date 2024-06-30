@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net/http"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -29,9 +28,15 @@ func main() {
 
 	router.Use(middleware.CORS(), middleware.Recover(), middleware.Logger())
 
-	router.GET("/tasks", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, tm.GetTasks())
-	})
+	router.GET("/ws/tasks?workspace_id=dasdasd", nil)
+	router.GET("/ws/messages?workspace_id=dasdasd", nil)
+
+	router.GET("/tasks", gethandleGetTasks(tm))
+	router.GET("/ws/tasks", getHandleListenTasks(tm))
+
+	for _, route := range router.Routes() {
+		router.Logger.Debug(route.Method + " - " + route.Path)
+	}
 
 	router.Start(fmt.Sprintf(":%d", config.Port))
 }
