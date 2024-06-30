@@ -1,8 +1,6 @@
 package main
 
-import (
-	"sync"
-)
+import "sync"
 
 type TaskManager struct {
 	mu    sync.RWMutex
