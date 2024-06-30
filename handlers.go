@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-	"net"
 	"net/http"
 	"time"
 
@@ -18,15 +16,19 @@ func gethandleGetTasks(tm *TaskManager) echo.HandlerFunc {
 
 func getHandleListenTasks(wsManager *WSManager, tm *TaskManager) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		fmt.Printf("c.QueryParam(\"workspace_id\"): %v\n", c.QueryParam("workspace_id"))
-		fmt.Printf("c.QueryParam(\"api_key\"): %v\n", c.QueryParam("api_key"))
-
-		ws, err := wsManager.GetConnection(c)
+		workspace, err := wsManager.GetWorkspace(c)
 		if err != nil {
 			return err
 		}
 
-		defer ws.Close()
+		defer workspace.Close()
+
+		closeConn, err := workspace.NewConnection(c)
+		if err != nil {
+			return err
+		}
+
+		defer closeConn()
 
 		ticker := time.NewTicker(time.Second)
 		ctx := c.Request().Context()
@@ -38,20 +40,7 @@ func getHandleListenTasks(wsManager *WSManager, tm *TaskManager) echo.HandlerFun
 			default:
 				tasks := tm.GetTasks()
 
-				err := ws.WriteMessage(websocket.TextMessage, mustJSONEncode(tasks))
-				if err != nil {
-					if websocket.IsCloseError(err) || websocket.IsUnexpectedCloseError(err) {
-						return nil
-					}
-
-					c.Logger().Error(err)
-
-					if _, ok := err.(*net.OpError); ok {
-						return nil
-					}
-
-					continue
-				}
+				workspace.WriteMessage(websocket.TextMessage, mustJSONEncode(tasks))
 			}
 		}
 

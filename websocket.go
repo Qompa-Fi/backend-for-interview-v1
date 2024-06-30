@@ -1,11 +1,11 @@
 package main
 
 import (
+	"net"
 	"net/http"
 	"regexp"
 	"strings"
 	"sync"
-	"sync/atomic"
 
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
@@ -32,7 +32,7 @@ func NewWSManager(config *Config) *WSManager {
 	}
 }
 
-func (m *WSManager) GetConnection(c echo.Context) (*websocket.Conn, error) {
+func (m *WSManager) GetWorkspace(c echo.Context) (*Workspace, error) {
 	apiKey, workspaceId, err := m.getApiKeyAndWorkspaceId(c)
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func (m *WSManager) GetConnection(c echo.Context) (*websocket.Conn, error) {
 		return nil, echo.NewHTTPError(http.StatusTooManyRequests, "too many workspaces")
 	}
 
-	conn, err := client.GetWorkspaceConnection(c, workspaceId)
+	conn, err := client.GetWorkspace(c, apiKey, workspaceId)
 	if err != nil {
 		return nil, err
 	}
@@ -88,22 +88,15 @@ func (m *WSManager) getApiKeyAndWorkspaceId(c echo.Context) (apiKey string, work
 	return apiKey, workspaceId, nil
 }
 
-type (
-	WSClient struct {
-		mu         sync.RWMutex
-		workspaces map[string]Workspace
-		config     *Config
-	}
-
-	Workspace struct {
-		count      uint64
-		connection *websocket.Conn
-	}
-)
+type WSClient struct {
+	mu         sync.RWMutex
+	workspaces map[string]*Workspace
+	config     *Config
+}
 
 func newWSClient(config *Config) *WSClient {
 	return &WSClient{
-		workspaces: make(map[string]Workspace),
+		workspaces: make(map[string]*Workspace),
 		config:     config,
 	}
 }
@@ -115,57 +108,107 @@ func (wsc *WSClient) GetNumberOfWorkspaces() uint64 {
 	return uint64(len(wsc.workspaces))
 }
 
-func (wsc *WSClient) GetWorkspaceConnection(c echo.Context, workspaceId string) (*websocket.Conn, error) {
+func (wsc *WSClient) GetWorkspace(c echo.Context, apiKey, workspaceId string) (*Workspace, error) {
 	wsc.mu.RLock()
 	workspace, ok := wsc.workspaces[workspaceId]
 	wsc.mu.RUnlock()
 
-	if workspace.count >= wsc.config.MaxWorkspaceConnections {
-		return nil, echo.NewHTTPError(http.StatusTooManyRequests, "too many connections")
+	if !ok {
+		workspace = newWorkspace()
+
+		log.Infof("new workspace '%s' created for client with api key '%s'", workspaceId, apiKey)
+
+		wsc.mu.Lock()
+		wsc.workspaces[workspaceId] = workspace
+		wsc.mu.Unlock()
+	} else {
+		log.Infof("incoming connection to workspace '%s' created for client with api key '%s'", workspaceId, apiKey)
 	}
 
-	atomic.AddUint64(&workspace.count, 1)
-
-	if ok {
-		return workspace.connection, nil
+	if workspace.GetConnectionCount() >= wsc.config.MaxWorkspaceConnections {
+		return nil, echo.NewHTTPError(http.StatusTooManyRequests, "too many connections in workspace")
 	}
 
-	conn, err := wsc.createWorkspaceConnection(c, workspaceId)
-	if err != nil {
-		return nil, err
-	}
-
-	return conn, nil
+	return workspace, nil
 }
 
-func (wsc *WSClient) createWorkspaceConnection(c echo.Context, workspaceId string) (*websocket.Conn, error) {
-	wsc.mu.RLock()
-	workspace, ok := wsc.workspaces[workspaceId]
-	wsc.mu.RUnlock()
+func (wsc *WSClient) Close() {
+	wsc.mu.Lock()
 
-	if ok {
-		return workspace.connection, nil
+	for _, workspace := range wsc.workspaces {
+		workspace.Close()
 	}
 
+	wsc.mu.Unlock()
+}
+
+type Workspace struct {
+	mu          sync.RWMutex
+	connections map[*websocket.Conn]struct{}
+}
+
+func newWorkspace() *Workspace {
+	return &Workspace{
+		connections: make(map[*websocket.Conn]struct{}),
+	}
+}
+
+func (w *Workspace) GetConnectionCount() uint64 {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+
+	return uint64(len(w.connections))
+}
+
+func (w *Workspace) WriteMessage(messageType int, data []byte) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+
+	for conn := range w.connections {
+		err := conn.WriteMessage(messageType, data)
+		if err != nil {
+			if websocket.IsCloseError(err) || websocket.IsUnexpectedCloseError(err) {
+				continue
+			}
+
+			log.Error(err)
+
+			if _, ok := err.(*net.OpError); ok {
+				continue
+			}
+		}
+	}
+}
+
+func (w *Workspace) NewConnection(c echo.Context) (func(), error) {
 	conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
 		return nil, err
 	}
 
-	wsc.mu.Lock()
-	wsc.workspaces[workspaceId] = Workspace{connection: conn, count: 0}
-	wsc.mu.Unlock()
+	w.mu.Lock()
+	w.connections[conn] = struct{}{}
+	w.mu.Unlock()
 
-	return conn, nil
+	return func() {
+		w.mu.Lock()
+		delete(w.connections, conn)
+		w.mu.Unlock()
+
+		if err := conn.Close(); err != nil {
+			log.Error(err)
+		}
+	}, nil
 }
 
-func (wsc *WSClient) Close() {
-	wsc.mu.Lock()
-	for _, workspace := range wsc.workspaces {
-		if err := workspace.connection.Close(); err != nil {
+func (w *Workspace) Close() {
+	w.mu.Lock()
+
+	for conn := range w.connections {
+		if err := conn.Close(); err != nil {
 			log.Error(err)
 		}
 	}
 
-	wsc.mu.Unlock()
+	w.mu.Unlock()
 }
