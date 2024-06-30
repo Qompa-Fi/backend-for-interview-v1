@@ -8,11 +8,13 @@ import (
 )
 
 type Config struct {
-	Port    uint16   `env:"PORT"     envDefault:"8700" validate:"required,number,gte=0,lte=65535"`
-	APIKeys []string `env:"API_KEYS" envSeparator:","  validate:"required"`
+	Port                    uint16   `env:"PORT"                      envDefault:"8700" validate:"required,number,gte=0,lte=65535"`
+	APIKeys                 []string `env:"API_KEYS"                  envSeparator:","  validate:"required"`
+	MaxWorkspaces           uint64   `env:"MAX_WORKSPACES"            envDefault:"4"    validate:"required,number,gte=0,lte=4"`
+	MaxWorkspaceConnections uint64   `env:"MAX_WORKSPACE_CONNECTIONS" envDefault:"10"   validate:"required,number,gte=0,lte=255"`
 }
 
-func newConfig() Config {
+func newConfig() *Config {
 	var c Config
 
 	if err := env.Parse(&c); err != nil {
@@ -24,5 +26,5 @@ func newConfig() Config {
 		log.Fatal(err)
 	}
 
-	return c
+	return &c
 }

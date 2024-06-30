@@ -1,16 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/gommon/log"
 )
-
-var upgrader websocket.Upgrader
 
 func gethandleGetTasks(tm *TaskManager) echo.HandlerFunc {
 	return func(c echo.Context) error {
@@ -18,12 +16,13 @@ func gethandleGetTasks(tm *TaskManager) echo.HandlerFunc {
 	}
 }
 
-func getHandleListenTasks(tm *TaskManager) echo.HandlerFunc {
+func getHandleListenTasks(wsManager *WSManager, tm *TaskManager) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		ws, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
-		if err != nil {
-			log.Error(err)
+		fmt.Printf("c.QueryParam(\"workspace_id\"): %v\n", c.QueryParam("workspace_id"))
+		fmt.Printf("c.QueryParam(\"api_key\"): %v\n", c.QueryParam("api_key"))
 
+		ws, err := wsManager.GetConnection(c)
+		if err != nil {
 			return err
 		}
 
