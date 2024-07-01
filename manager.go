@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
 	"github.com/samber/lo"
 )
@@ -18,10 +17,7 @@ type Manager struct {
 	config    *Config
 }
 
-var (
-	rxWorkspaceId = regexp.MustCompile(`^[A-z\-\_\d]+$`)
-	upgrader      websocket.Upgrader
-)
+var rxWorkspaceId = regexp.MustCompile(`^[A-z\-\_\d]+$`)
 
 var ErrNoConnectionsInWorkspace = errors.New("no connections in workspace")
 

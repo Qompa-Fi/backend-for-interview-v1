@@ -98,3 +98,20 @@ func getDeleteTaskHandler(m *Manager) echo.HandlerFunc {
 		return c.NoContent(http.StatusNoContent)
 	}
 }
+
+func getFlushTasksHandler(m *Manager) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		workspace, err := m.GetWorkspace(c)
+		if err != nil {
+			return err
+		}
+
+		if err := workspace.FlushTasks(); err != nil {
+			c.Logger().Error(err)
+
+			return echo.NewHTTPError(http.StatusInternalServerError, "internal server error")
+		}
+
+		return c.NoContent(http.StatusNoContent)
+	}
+}

@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net"
+	"net/http"
 	"sync"
 	"time"
 
@@ -11,16 +12,20 @@ import (
 	"github.com/labstack/gommon/log"
 )
 
-type (
-	Workspace struct {
-		mu          sync.RWMutex
-		connections map[*websocket.Conn]struct{}
+type Workspace struct {
+	mu          sync.RWMutex
+	connections map[*websocket.Conn]struct{}
 
-		inLoop bool
+	inLoop bool
 
-		tm *TaskManager
-	}
-)
+	tm *TaskManager
+}
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+}
 
 func newWorkspace(config *Config) *Workspace {
 	return &Workspace{
@@ -110,19 +115,6 @@ func (w *Workspace) WSSubscribeToTasks(c echo.Context) error {
 	return nil
 }
 
-func (w *Workspace) WSSubscribeToTaskMessages(c echo.Context) error {
-	conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
-	if err != nil {
-		return err
-	}
-
-	w.mu.Lock()
-	w.connections[conn] = struct{}{}
-	w.mu.Unlock()
-
-	return nil
-}
-
 func (w *Workspace) GetTasks() []*Task {
 	return w.tm.GetTasks()
 }
@@ -133,6 +125,10 @@ func (w *Workspace) AddTask(name string, taskType TaskType) *Task {
 
 func (w *Workspace) DeleteTask(id uint64) error {
 	return w.tm.DeleteTask(id)
+}
+
+func (w *Workspace) FlushTasks() error {
+	return w.tm.FlushTasks()
 }
 
 func (w *Workspace) Close() {

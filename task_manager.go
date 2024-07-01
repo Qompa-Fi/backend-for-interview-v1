@@ -68,6 +68,15 @@ func (m *TaskManager) DeleteTask(id uint64) error {
 	return ErrTaskNotFound
 }
 
+func (m *TaskManager) FlushTasks() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.dispatchedTasks = make([]*Task, 0)
+
+	return nil
+}
+
 func (m *TaskManager) dispatchTasksLoop() {
 	runningChan := make(chan struct{}, m.config.MaxRunningWorkspaceTasks)
 
