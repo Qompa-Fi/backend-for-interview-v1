@@ -127,10 +127,12 @@ func (wsc *WSClient) GetWorkspace(c echo.Context, apiKey, workspaceId string) (*
 		wsc.workspaces[workspaceId] = workspace
 		wsc.mu.Unlock()
 	} else {
-		log.Infof("incoming connection to workspace '%s' created for client with api key '%s'", workspaceId, apiKey)
+		if c.IsWebSocket() {
+			log.Infof("incoming WS connection to workspace '%s' created for client with api key '%s'", workspaceId, apiKey)
+		}
 	}
 
-	if !workspace.inLoop {
+	if c.IsWebSocket() && !workspace.inLoop {
 		go workspace.serveConnectionsLoop()
 	}
 
@@ -232,7 +234,7 @@ func (w *Workspace) WriteMessage(messageType int, data []byte) error {
 	return nil
 }
 
-func (w *Workspace) Subscribe(c echo.Context) error {
+func (w *Workspace) WSSubscribeToTasks(c echo.Context) error {
 	conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
 		return err
