@@ -13,13 +13,14 @@ func newTaskManager() *TaskManager {
 	}
 }
 
-func (m *TaskManager) AddTask(name string) *Task {
+func (m *TaskManager) AddTask(name string, taskType TaskType) *Task {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	task := &Task{
 		ID:   uint64(len(m.tasks)) + 1,
 		Name: name,
+		Type: taskType,
 	}
 
 	m.tasks = append(m.tasks, task)

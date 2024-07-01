@@ -245,8 +245,8 @@ func (w *Workspace) Subscribe(c echo.Context) error {
 	return nil
 }
 
-func (w *Workspace) AddTask(name string) *Task {
-	return w.tm.AddTask(name)
+func (w *Workspace) AddTask(name string, taskType TaskType) *Task {
+	return w.tm.AddTask(name, taskType)
 }
 
 func (w *Workspace) Close() {

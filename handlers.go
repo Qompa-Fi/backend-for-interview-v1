@@ -4,10 +4,12 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+	"github.com/samber/lo"
 )
 
 type createTaskDto struct {
-	Name string `json:"name" validate:"required"`
+	Name string   `json:"name"`
+	Type TaskType `json:"type"`
 }
 
 func getGetTasksHandler() echo.HandlerFunc {
@@ -46,9 +48,11 @@ func getCreateTaskHandler(m *Manager) echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 		} else if dto.Name == "" {
 			return echo.NewHTTPError(http.StatusBadRequest, "name is required")
+		} else if !lo.Contains(GetTaskTypes(), dto.Type) {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid task type")
 		}
 
-		task := workspace.AddTask(dto.Name)
+		task := workspace.AddTask(dto.Name, dto.Type)
 
 		return c.JSON(http.StatusOK, echo.Map{
 			"task": task,
