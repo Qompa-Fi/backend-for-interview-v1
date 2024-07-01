@@ -8,15 +8,17 @@ import (
 	"github.com/samber/lo"
 )
 
-type TaskManager struct {
-	mu     sync.RWMutex
-	nextId uint64
+type (
+	TaskManager struct {
+		mu     sync.RWMutex
+		nextId uint64
 
-	config *Config
+		config *Config
 
-	dispatchedTasks   []*Task
-	undispatchedTasks []*Task
-}
+		dispatchedTasks   []*Task
+		undispatchedTasks []*Task
+	}
+)
 
 func newTaskManager(config *Config) *TaskManager {
 	tm := &TaskManager{
@@ -29,6 +31,24 @@ func newTaskManager(config *Config) *TaskManager {
 	go tm.dispatchTasksLoop()
 
 	return tm
+}
+
+func (m *TaskManager) AddTask(name string, taskType TaskType) *Task {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	task := m.newTask(name, taskType)
+
+	m.undispatchedTasks = append(m.undispatchedTasks, task)
+
+	return task
+}
+
+func (m *TaskManager) GetTasks() []*Task {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	return append(m.dispatchedTasks, m.undispatchedTasks...)
 }
 
 func (m *TaskManager) dispatchTasksLoop() {
@@ -73,33 +93,14 @@ func (m *TaskManager) getNextTask() (*Task, bool) {
 	return task, true
 }
 
-func (m *TaskManager) AddTask(name string, taskType TaskType) *Task {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	task := NewTask(m.nextId, name, taskType)
+func (m *TaskManager) newTask(name string, taskType TaskType) *Task {
+	id := m.nextId
 	atomic.AddUint64(&m.nextId, 1)
 
-	m.undispatchedTasks = append(m.undispatchedTasks, task)
-
-	return task
-}
-
-func (m *TaskManager) GetTasks() []*Task {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	return append(m.dispatchedTasks, m.undispatchedTasks...)
-}
-
-func (m *TaskManager) CancelTask(task *Task) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	for i, t := range m.undispatchedTasks {
-		if t.ID == task.ID {
-			m.undispatchedTasks = append(m.undispatchedTasks[:i], m.undispatchedTasks[i+1:]...)
-			return
-		}
+	return &Task{
+		ID:     id,
+		Name:   name,
+		Type:   taskType,
+		Status: StatusQueued,
 	}
 }

@@ -11,13 +11,16 @@ import (
 	"github.com/labstack/gommon/log"
 )
 
-type Workspace struct {
-	mu          sync.RWMutex
-	connections map[*websocket.Conn]struct{}
+type (
+	Workspace struct {
+		mu          sync.RWMutex
+		connections map[*websocket.Conn]struct{}
 
-	inLoop bool
-	tm     *TaskManager
-}
+		inLoop bool
+
+		tm *TaskManager
+	}
+)
 
 func newWorkspace(config *Config) *Workspace {
 	return &Workspace{
@@ -29,12 +32,11 @@ func newWorkspace(config *Config) *Workspace {
 func (w *Workspace) serveConnectionsLoop() {
 	defer w.Close()
 
-	log.Info("starting new loop...")
-
-	ticker := time.NewTicker(time.Second)
 	w.inLoop = true
 
-	for range ticker.C {
+	log.Info("starting new loop...")
+
+	for {
 		tasks := w.tm.GetTasks()
 
 		err := w.WriteMessage(websocket.TextMessage, mustJSONEncode(tasks))
@@ -45,11 +47,14 @@ func (w *Workspace) serveConnectionsLoop() {
 				log.Error(err)
 			}
 
-			log.Info("closing loop...")
+			log.Info("closing tasks loop...")
+
 			w.inLoop = false
 
 			break
 		}
+
+		time.Sleep(time.Second)
 	}
 }
 
@@ -93,6 +98,19 @@ func (w *Workspace) WriteMessage(messageType int, data []byte) error {
 }
 
 func (w *Workspace) WSSubscribeToTasks(c echo.Context) error {
+	conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
+	if err != nil {
+		return err
+	}
+
+	w.mu.Lock()
+	w.connections[conn] = struct{}{}
+	w.mu.Unlock()
+
+	return nil
+}
+
+func (w *Workspace) WSSubscribeToTaskMessages(c echo.Context) error {
 	conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
 		return err

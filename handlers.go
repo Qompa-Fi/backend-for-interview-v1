@@ -12,19 +12,6 @@ type createTaskDto struct {
 	Type TaskType `json:"type"`
 }
 
-func getGetTasksHandler(m *Manager) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		workspace, err := m.GetWorkspace(c)
-		if err != nil {
-			return err
-		}
-
-		return c.JSON(http.StatusOK, echo.Map{
-			"tasks": workspace.GetTasks(),
-		})
-	}
-}
-
 func getWSTasksHandler(m *Manager) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		workspace, err := m.GetWorkspace(c)
@@ -37,6 +24,19 @@ func getWSTasksHandler(m *Manager) echo.HandlerFunc {
 		}
 
 		return nil
+	}
+}
+
+func getGetTasksHandler(m *Manager) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		workspace, err := m.GetWorkspace(c)
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(http.StatusOK, echo.Map{
+			"tasks": workspace.GetTasks(),
+		})
 	}
 }
 

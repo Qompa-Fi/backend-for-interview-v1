@@ -69,8 +69,6 @@ func (TaskType) randomIntensity() float64 {
 }
 
 type Task struct {
-	logger SafeBuffer
-
 	ID     uint64     `json:"id"`
 	Name   string     `json:"name"`
 	Type   TaskType   `json:"type"`
@@ -99,7 +97,6 @@ func (t *Task) SetStatus(status TaskStatus) {
 }
 
 func (t *Task) Start() {
-	t.logger.WriteString("Task started\n")
 	t.SetStatus(StatusRunning)
 
 	d := t.GetDuration()
@@ -107,14 +104,4 @@ func (t *Task) Start() {
 	time.Sleep(d)
 
 	t.SetStatus(StatusCompleted)
-
-	t.logger.WriteString("Task completed\n")
-}
-
-func (t *Task) Cancel() {
-	t.logger.WriteString("Task cancelled\n")
-}
-
-func (t *Task) Log(message string) {
-	t.logger.WriteString(`{"message": "` + message + `", "at": "` + time.Now().Local().String() + `"}\n`)
 }

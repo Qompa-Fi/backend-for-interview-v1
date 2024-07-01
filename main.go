@@ -22,7 +22,6 @@ func main() {
 
 	router.Use(middleware.CORS(), middleware.Recover(), middleware.Logger())
 	router.GET("/ws/tasks", getWSTasksHandler(manager))
-	router.GET("/ws/messages", nil)
 
 	router.GET("/tasks", getGetTasksHandler(manager))
 	router.POST("/tasks", getCreateTaskHandler(manager))
