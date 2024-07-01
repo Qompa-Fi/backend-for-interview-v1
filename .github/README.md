@@ -202,3 +202,7 @@ Nothing but *204 No Content*.
 # asdas
 $ curl -X POST 'https://<host>/tasks/flush?api_key=<api_key>&workspace_id=<workspace_id>'
 ```
+
+## LICENSE
+
+[MIT](./LICENSE)
