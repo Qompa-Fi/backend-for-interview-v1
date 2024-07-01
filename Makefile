@@ -2,8 +2,8 @@
 .PHONY: build
 
 build:
-	@mkdir -p tmp
-	@go build -o tmp/server .
+	@mkdir -p build
+	@go build -o build/server .
 
 run: build
-	@./tmp/server
+	@./build/server
