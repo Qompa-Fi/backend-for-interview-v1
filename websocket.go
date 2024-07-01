@@ -15,11 +15,10 @@ import (
 	"github.com/samber/lo"
 )
 
-type WSManager struct {
-	mu      sync.RWMutex
-	clients map[string]*WSClient
-
-	config *Config
+type Manager struct {
+	mu        sync.RWMutex
+	wsClients map[string]*WSClient
+	config    *Config
 }
 
 var (
@@ -29,52 +28,54 @@ var (
 
 var ErrNoConnectionsInWorkspace = errors.New("no connections in workspace")
 
-func NewWSManager(config *Config) *WSManager {
-	return &WSManager{
-		clients: make(map[string]*WSClient),
-		config:  config,
+func NewManager(config *Config) *Manager {
+	return &Manager{
+		wsClients: make(map[string]*WSClient),
+		config:    config,
 	}
 }
 
-func (m *WSManager) GetWorkspace(c echo.Context) (*Workspace, error) {
+func (m *Manager) GetWorkspace(c echo.Context) (*Workspace, error) {
 	apiKey, workspaceId, err := m.getApiKeyAndWorkspaceId(c)
 	if err != nil {
 		return nil, err
 	}
 
 	m.mu.RLock()
-	client, ok := m.clients[apiKey]
+	client, ok := m.wsClients[apiKey]
 	m.mu.RUnlock()
 
 	if !ok {
 		client = newWSClient(m.config)
 
 		m.mu.Lock()
-		m.clients[apiKey] = client
+		m.wsClients[apiKey] = client
 		m.mu.Unlock()
 	}
 
-	if client.GetNumberOfWorkspaces() >= m.config.MaxWorkspaces {
-		return nil, echo.NewHTTPError(http.StatusTooManyRequests, "too many workspaces")
+	if c.IsWebSocket() {
+		if client.GetNumberOfWorkspaces() >= m.config.MaxWorkspaces {
+			return nil, echo.NewHTTPError(http.StatusTooManyRequests, "too many workspaces")
+		}
 	}
 
-	conn, err := client.GetWorkspace(c, apiKey, workspaceId)
+	workspace, err := client.GetWorkspace(c, apiKey, workspaceId)
 	if err != nil {
 		return nil, err
 	}
 
-	return conn, nil
+	return workspace, nil
 }
 
-func (m *WSManager) Close() {
+func (m *Manager) Close() {
 	m.mu.Lock()
-	for _, client := range m.clients {
+	for _, client := range m.wsClients {
 		client.Close()
 	}
 	m.mu.Unlock()
 }
 
-func (m *WSManager) getApiKeyAndWorkspaceId(c echo.Context) (apiKey string, workspaceId string, err error) {
+func (m *Manager) getApiKeyAndWorkspaceId(c echo.Context) (apiKey string, workspaceId string, err error) {
 	apiKey = strings.TrimSpace(c.QueryParam("api_key"))
 	if !lo.Contains(m.config.APIKeys, apiKey) {
 		return "", "", echo.ErrForbidden
@@ -244,8 +245,8 @@ func (w *Workspace) Subscribe(c echo.Context) error {
 	return nil
 }
 
-func (w *Workspace) AddTask(name string) {
-	w.tm.AddTask(name)
+func (w *Workspace) AddTask(name string) *Task {
+	return w.tm.AddTask(name)
 }
 
 func (w *Workspace) Close() {
