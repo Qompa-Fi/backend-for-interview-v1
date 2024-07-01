@@ -245,6 +245,10 @@ func (w *Workspace) Subscribe(c echo.Context) error {
 	return nil
 }
 
+func (w *Workspace) GetTasks() []*Task {
+	return w.tm.GetTasks()
+}
+
 func (w *Workspace) AddTask(name string, taskType TaskType) *Task {
 	return w.tm.AddTask(name, taskType)
 }
