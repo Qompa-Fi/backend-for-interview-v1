@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -19,6 +20,8 @@ type (
 		undispatchedTasks []*Task
 	}
 )
+
+var ErrTaskNotFound = errors.New("task not found")
 
 func newTaskManager(config *Config) *TaskManager {
 	tm := &TaskManager{
@@ -49,6 +52,20 @@ func (m *TaskManager) GetTasks() []*Task {
 	defer m.mu.RUnlock()
 
 	return append(m.dispatchedTasks, m.undispatchedTasks...)
+}
+
+func (m *TaskManager) DeleteTask(id uint64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for i, task := range m.undispatchedTasks {
+		if task.ID == id {
+			m.undispatchedTasks = append(m.undispatchedTasks[:i], m.undispatchedTasks[i+1:]...)
+			return nil
+		}
+	}
+
+	return ErrTaskNotFound
 }
 
 func (m *TaskManager) dispatchTasksLoop() {

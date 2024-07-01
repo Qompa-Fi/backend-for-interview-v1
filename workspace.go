@@ -131,6 +131,10 @@ func (w *Workspace) AddTask(name string, taskType TaskType) *Task {
 	return w.tm.AddTask(name, taskType)
 }
 
+func (w *Workspace) DeleteTask(id uint64) error {
+	return w.tm.DeleteTask(id)
+}
+
 func (w *Workspace) Close() {
 	w.mu.Lock()
 

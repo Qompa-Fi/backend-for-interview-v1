@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/labstack/echo/v4"
 	"github.com/samber/lo"
@@ -64,5 +66,35 @@ func getCreateTaskHandler(m *Manager) echo.HandlerFunc {
 		return c.JSON(http.StatusOK, echo.Map{
 			"task": task,
 		})
+	}
+}
+
+func getDeleteTaskHandler(m *Manager) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		workspace, err := m.GetWorkspace(c)
+		if err != nil {
+			return err
+		}
+
+		rawId := c.Param("id")
+
+		id, err := strconv.ParseUint(rawId, 10, strconv.IntSize)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid task id")
+		}
+
+		if err := workspace.DeleteTask(id); err != nil {
+			if errors.Is(err, ErrTaskNotFound) {
+				msg := "the task could not be found, it is either being dispatched or has already been dispatched"
+
+				return echo.NewHTTPError(http.StatusNotFound, msg)
+			}
+
+			c.Logger().Error(err)
+
+			return echo.NewHTTPError(http.StatusInternalServerError, "internal server error")
+		}
+
+		return c.NoContent(http.StatusNoContent)
 	}
 }

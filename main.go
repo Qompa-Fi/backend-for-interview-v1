@@ -25,6 +25,7 @@ func main() {
 
 	router.GET("/tasks", getGetTasksHandler(manager))
 	router.POST("/tasks", getCreateTaskHandler(manager))
+	router.DELETE("/tasks/:id", getDeleteTaskHandler(manager))
 
 	for _, route := range router.Routes() {
 		fmt.Fprintf(os.Stderr, "%s %s - %s\n", time.Now().Local().Format(time.RFC3339), route.Method, route.Path)
