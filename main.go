@@ -18,7 +18,7 @@ func main() {
 
 	router := echo.New()
 	router.Logger.SetLevel(log.DEBUG)
-	router.IPExtractor = echo.ExtractIPDirect()
+	router.IPExtractor = echo.ExtractIPFromRealIPHeader()
 
 	router.Use(middleware.CORS(), middleware.Recover(), middleware.Logger())
 	router.GET("/ws/tasks", getWSTasksHandler(manager))
