@@ -1,7 +1,9 @@
 
 # Backend for Technical interview V1
 
-## Endpoints
+## Endpoints overview
+
+I didn't write the documentation in OpenAPI format because it doesn't provide real support for WebSockets endpoints.
 
 ### `GET /ws/tasks` - Open a WebSocket connection to read the tasks for the current workspace
 
