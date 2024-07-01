@@ -18,12 +18,6 @@ func main() {
 
 	config := newConfig()
 
-	taskManager := newTaskManager()
-
-	taskManager.AddTask("nao nao")
-	taskManager.AddTask("just another task")
-	taskManager.AddTask("panzer")
-
 	router := echo.New()
 	router.IPExtractor = echo.ExtractIPDirect()
 
@@ -32,10 +26,10 @@ func main() {
 	wsManager := NewWSManager(config)
 	defer wsManager.Close()
 
-	router.GET("/ws/tasks", getHandleListenTasks(wsManager, taskManager))
+	router.GET("/ws/tasks", getHandleListenTasks(wsManager))
 	router.GET("/ws/messages", nil)
 
-	router.GET("/tasks", gethandleGetTasks(taskManager))
+	router.GET("/tasks", gethandleGetTasks())
 
 	router.Logger.SetLevel(log.DEBUG)
 

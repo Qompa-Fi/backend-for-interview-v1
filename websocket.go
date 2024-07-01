@@ -1,11 +1,13 @@
 package main
 
 import (
+	"errors"
 	"net"
 	"net/http"
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
@@ -24,6 +26,8 @@ var (
 	rxWorkspaceId = regexp.MustCompile(`^[A-z\-\_\d]+$`)
 	upgrader      websocket.Upgrader
 )
+
+var ErrNoConnectionsInWorkspace = errors.New("no connections in workspace")
 
 func NewWSManager(config *Config) *WSManager {
 	return &WSManager{
@@ -125,6 +129,10 @@ func (wsc *WSClient) GetWorkspace(c echo.Context, apiKey, workspaceId string) (*
 		log.Infof("incoming connection to workspace '%s' created for client with api key '%s'", workspaceId, apiKey)
 	}
 
+	if !workspace.inLoop {
+		go workspace.serveConnectionsLoop()
+	}
+
 	if workspace.GetConnectionCount() >= wsc.config.MaxWorkspaceConnections {
 		return nil, echo.NewHTTPError(http.StatusTooManyRequests, "too many connections in workspace")
 	}
@@ -145,11 +153,42 @@ func (wsc *WSClient) Close() {
 type Workspace struct {
 	mu          sync.RWMutex
 	connections map[*websocket.Conn]struct{}
+
+	inLoop bool
+	tm     *TaskManager
 }
 
 func newWorkspace() *Workspace {
 	return &Workspace{
 		connections: make(map[*websocket.Conn]struct{}),
+		tm:          newTaskManager(),
+	}
+}
+
+func (w *Workspace) serveConnectionsLoop() {
+	defer w.Close()
+
+	log.Info("starting new loop...")
+
+	ticker := time.NewTicker(time.Second)
+	w.inLoop = true
+
+	for range ticker.C {
+		tasks := w.tm.GetTasks()
+
+		err := w.WriteMessage(websocket.TextMessage, mustJSONEncode(tasks))
+		if err != nil {
+			if errors.Is(err, ErrNoConnectionsInWorkspace) {
+				log.Debug("no connections in workspace...")
+			} else {
+				log.Error(err)
+			}
+
+			log.Info("closing loop...")
+			w.inLoop = false
+
+			break
+		}
 	}
 }
 
@@ -160,51 +199,60 @@ func (w *Workspace) GetConnectionCount() uint64 {
 	return uint64(len(w.connections))
 }
 
-func (w *Workspace) WriteMessage(messageType int, data []byte) {
-	w.mu.RLock()
-	defer w.mu.RUnlock()
+func (w *Workspace) WriteMessage(messageType int, data []byte) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if len(w.connections) == 0 {
+		return ErrNoConnectionsInWorkspace
+	}
 
 	for conn := range w.connections {
 		err := conn.WriteMessage(messageType, data)
 		if err != nil {
 			if websocket.IsCloseError(err) || websocket.IsUnexpectedCloseError(err) {
-				continue
+				delete(w.connections, conn)
+				conn.Close()
 			}
 
 			log.Error(err)
 
 			if _, ok := err.(*net.OpError); ok {
-				continue
+				delete(w.connections, conn)
+				conn.Close()
 			}
 		}
 	}
+
+	if len(w.connections) == 0 {
+		return ErrNoConnectionsInWorkspace
+	}
+
+	return nil
 }
 
-func (w *Workspace) NewConnection(c echo.Context) (func(), error) {
+func (w *Workspace) Subscribe(c echo.Context) error {
 	conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	w.mu.Lock()
 	w.connections[conn] = struct{}{}
 	w.mu.Unlock()
 
-	return func() {
-		w.mu.Lock()
-		delete(w.connections, conn)
-		w.mu.Unlock()
+	return nil
+}
 
-		if err := conn.Close(); err != nil {
-			log.Error(err)
-		}
-	}, nil
+func (w *Workspace) AddTask(name string) {
+	w.tm.AddTask(name)
 }
 
 func (w *Workspace) Close() {
 	w.mu.Lock()
 
 	for conn := range w.connections {
+		delete(w.connections, conn)
 		if err := conn.Close(); err != nil {
 			log.Error(err)
 		}
