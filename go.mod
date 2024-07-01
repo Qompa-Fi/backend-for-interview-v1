@@ -1,4 +1,4 @@
-module github.com/project-25asd2a25251414/backend-for-interview-v1
+module github.com/project-7pmwvjf9/backend-for-interview-v1
 
 go 1.22.3
 
