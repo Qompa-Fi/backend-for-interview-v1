@@ -1,25 +1,23 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
-	"sync"
 	"time"
 )
 
 type (
-	Task struct {
-		mu     sync.Mutex
-		logger SafeBuffer
+	TaskStatus string
+	TaskType   string
+)
 
-		ID   uint64   `json:"id"`
-		Name string   `json:"name"`
-		Type TaskType `json:"type"`
-
-		duration  time.Duration
-		intensity uint64
-	}
-
-	TaskType string
+const (
+	StatusRunning   TaskStatus = "running"
+	StatusCancelled TaskStatus = "cancelled"
+	StatusQueued    TaskStatus = "queued"
+	StatusCompleted TaskStatus = "completed"
+	StatusFailed    TaskStatus = "failed"
+	// StatusPaused    TaskStatus = "paused"
 )
 
 // Type tasks. For fictional purposes only.
@@ -43,7 +41,7 @@ func GetTaskTypes() []TaskType {
 	}
 }
 
-func (tt TaskType) RandomDuration() time.Duration {
+func (tt TaskType) randomDuration() time.Duration {
 	var initDuration time.Duration
 
 	switch tt {
@@ -66,19 +64,51 @@ func (tt TaskType) RandomDuration() time.Duration {
 	return time.Duration(float64(initDuration) * factor)
 }
 
-func (TaskType) RandomIntensity() float64 {
+func (TaskType) randomIntensity() float64 {
 	return rand.Float64()
+}
+
+type Task struct {
+	logger SafeBuffer
+
+	ID     uint64     `json:"id"`
+	Name   string     `json:"name"`
+	Type   TaskType   `json:"type"`
+	Status TaskStatus `json:"status"`
 }
 
 func NewTask(id uint64, name string, taskType TaskType) *Task {
 	return &Task{
-		ID:   id,
-		Name: name,
+		ID:     id,
+		Name:   name,
+		Type:   taskType,
+		Status: StatusQueued,
 	}
+}
+
+func (t *Task) GetDuration() time.Duration {
+	return t.Type.randomDuration()
+}
+
+func (t *Task) GetIntensity() float64 {
+	return t.Type.randomIntensity()
+}
+
+func (t *Task) SetStatus(status TaskStatus) {
+	t.Status = status
 }
 
 func (t *Task) Start() {
 	t.logger.WriteString("Task started\n")
+	t.SetStatus(StatusRunning)
+
+	d := t.GetDuration()
+	fmt.Println(d)
+	time.Sleep(d)
+
+	t.SetStatus(StatusCompleted)
+
+	t.logger.WriteString("Task completed\n")
 }
 
 func (t *Task) Cancel() {

@@ -1,29 +1,86 @@
 package main
 
-import "sync"
+import (
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"github.com/samber/lo"
+)
 
 type TaskManager struct {
-	mu    sync.RWMutex
-	tasks []*Task
+	mu     sync.RWMutex
+	nextId uint64
+
+	config *Config
+
+	dispatchedTasks   []*Task
+	undispatchedTasks []*Task
 }
 
-func newTaskManager() *TaskManager {
-	return &TaskManager{
-		tasks: make([]*Task, 0),
+func newTaskManager(config *Config) *TaskManager {
+	tm := &TaskManager{
+		dispatchedTasks:   make([]*Task, 0),
+		undispatchedTasks: make([]*Task, 0),
+		config:            config,
+		nextId:            1,
 	}
+
+	go tm.dispatchTasksLoop()
+
+	return tm
+}
+
+func (m *TaskManager) dispatchTasksLoop() {
+	runningChan := make(chan struct{}, m.config.MaxRunningWorkspaceTasks)
+
+	for {
+		task, ok := m.getNextTask()
+		if !ok {
+			time.Sleep(time.Second)
+			continue
+		}
+
+		runningChan <- struct{}{}
+
+		go func() {
+			defer func() {
+				<-runningChan
+			}()
+
+			task.Start()
+		}()
+
+		time.Sleep(time.Millisecond * 100)
+	}
+}
+
+func (m *TaskManager) getNextTask() (*Task, bool) {
+	m.mu.RLock()
+	task, index, ok := lo.FindIndexOf(m.undispatchedTasks, func(t *Task) bool {
+		return t.Status == StatusQueued
+	})
+	m.mu.RUnlock()
+	if !ok {
+		return nil, false
+	}
+
+	m.mu.Lock()
+	m.undispatchedTasks = append(m.undispatchedTasks[:index], m.undispatchedTasks[index+1:]...)
+	m.dispatchedTasks = append(m.dispatchedTasks, task)
+	m.mu.Unlock()
+
+	return task, true
 }
 
 func (m *TaskManager) AddTask(name string, taskType TaskType) *Task {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	task := &Task{
-		ID:   uint64(len(m.tasks)) + 1,
-		Name: name,
-		Type: taskType,
-	}
+	task := NewTask(m.nextId, name, taskType)
+	atomic.AddUint64(&m.nextId, 1)
 
-	m.tasks = append(m.tasks, task)
+	m.undispatchedTasks = append(m.undispatchedTasks, task)
 
 	return task
 }
@@ -32,16 +89,16 @@ func (m *TaskManager) GetTasks() []*Task {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	return m.tasks
+	return append(m.dispatchedTasks, m.undispatchedTasks...)
 }
 
 func (m *TaskManager) CancelTask(task *Task) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	for i, t := range m.tasks {
+	for i, t := range m.undispatchedTasks {
 		if t.ID == task.ID {
-			m.tasks = append(m.tasks[:i], m.tasks[i+1:]...)
+			m.undispatchedTasks = append(m.undispatchedTasks[:i], m.undispatchedTasks[i+1:]...)
 			return
 		}
 	}

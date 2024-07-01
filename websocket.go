@@ -119,7 +119,7 @@ func (wsc *WSClient) GetWorkspace(c echo.Context, apiKey, workspaceId string) (*
 	wsc.mu.RUnlock()
 
 	if !ok {
-		workspace = newWorkspace()
+		workspace = newWorkspace(wsc.config)
 
 		log.Infof("new workspace '%s' created for client with api key '%s'", workspaceId, apiKey)
 
@@ -161,10 +161,10 @@ type Workspace struct {
 	tm     *TaskManager
 }
 
-func newWorkspace() *Workspace {
+func newWorkspace(config *Config) *Workspace {
 	return &Workspace{
 		connections: make(map[*websocket.Conn]struct{}),
-		tm:          newTaskManager(),
+		tm:          newTaskManager(config),
 	}
 }
 

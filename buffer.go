@@ -7,11 +7,7 @@ import (
 
 type SafeBuffer struct {
 	mu sync.Mutex
-	b  *bytes.Buffer
-}
-
-func NewSafeBuffer() SafeBuffer {
-	return SafeBuffer{b: new(bytes.Buffer)}
+	b  bytes.Buffer
 }
 
 func (sb *SafeBuffer) Write(p []byte) (n int, err error) {
