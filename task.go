@@ -13,11 +13,8 @@ type (
 
 const (
 	StatusRunning   TaskStatus = "running"
-	StatusCancelled TaskStatus = "cancelled"
 	StatusQueued    TaskStatus = "queued"
 	StatusCompleted TaskStatus = "completed"
-	StatusFailed    TaskStatus = "failed"
-	// StatusPaused    TaskStatus = "paused"
 )
 
 // Type tasks. For fictional purposes only.
