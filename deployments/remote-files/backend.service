@@ -1,0 +1,14 @@
+# /etc/systemd/system/backend.service
+
+[Unit]
+Description=Backend for technical interview V1
+
+[Service]
+ExecStart=/app/server
+
+Environment="PORT=8080"
+Environment="API_KEYS="
+Environment="TZ=America/Lima"
+
+[Install]
+WantedBy=multi-user.target
