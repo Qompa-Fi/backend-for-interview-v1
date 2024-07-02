@@ -21,8 +21,9 @@ func main() {
 	router.IPExtractor = echo.ExtractIPFromRealIPHeader()
 
 	router.Use(middleware.CORS(), middleware.Recover(), middleware.Logger())
-	router.GET("/ws/tasks", getWSTasksHandler(manager))
 
+	router.GET("/", getIndexHandler(router))
+	router.GET("/ws/tasks", getWSTasksHandler(manager))
 	router.GET("/tasks", getGetTasksHandler(manager))
 	router.POST("/tasks", getCreateTaskHandler(manager))
 	router.DELETE("/tasks/:id", getDeleteTaskHandler(manager))

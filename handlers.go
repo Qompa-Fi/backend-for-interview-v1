@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -12,6 +13,54 @@ import (
 type createTaskDto struct {
 	Name string   `json:"name"`
 	Type TaskType `json:"type"`
+}
+
+func getIndexHandler(router *echo.Echo) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		txt := ` .              +   .                .   . .     .  .
+                   .                    .       .     *
+  .       *                        . . . .  .   .  + .
+             You Are Here             .   .  +  . . .
+.                 |             .  .   .    .    . .
+                  |           .     .     . +.    +  .
+                 \|/            .       .   . .
+        . .       V          .    * . . .  .  +   .
+           +      .           .   .      +
+                            .       . +  .+. .
+  .                      .     . + .  . .     .      .
+           .      .    .     . .   . . .        ! /
+      *             .    . .  +    .  .       - O -
+          .     .    .  +   . .  *  .       . / |
+               . + .  .  .  .. +  .
+.      .  .  .  *   .  *  . +..  .            *
+ .      .   . .   .   .   . .  +   .    .            +
+
+
+
+Other places:
+ - https://github.com/project-7pmwvjf9/backend-for-interview-v1
+ - https://github.com/project-7pmwvjf9/frontend-interview-v1
+`
+		txt += "\nAvailable endpoints:\n"
+
+		maxMethodLen := 0
+
+		for _, route := range router.Routes() {
+			if len(route.Method) > maxMethodLen {
+				maxMethodLen = len(route.Method)
+			}
+		}
+
+		for _, route := range router.Routes() {
+			if route.Path == "/" {
+				continue
+			}
+
+			txt += fmt.Sprintf("  %-*s - %s\n", maxMethodLen, route.Method, route.Path)
+		}
+
+		return c.String(http.StatusOK, txt)
+	}
 }
 
 func getWSTasksHandler(m *Manager) echo.HandlerFunc {
