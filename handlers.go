@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/samber/lo"
@@ -13,6 +14,15 @@ import (
 type createTaskDto struct {
 	Name string   `json:"name"`
 	Type TaskType `json:"type"`
+}
+
+func getServerStatsHandler(t *time.Time) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		return c.JSON(http.StatusOK, echo.Map{
+			"startedAt":   t.Local().Format(time.RFC3339),
+			"requestedAt": time.Now().Local().Format(time.RFC3339),
+		})
+	}
 }
 
 func getIndexHandler(router *echo.Echo) echo.HandlerFunc {
